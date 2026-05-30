@@ -3,11 +3,49 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import os
+import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(os.environ.get('CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('CHANNEL_SECRET'))
+
+def get_cats():
+    try:
+        url = "https://www.pet.gov.tw/Web/O302.aspx"
+        params = {
+            "unit": "63000", # 台北市
+            "animal_kind": "貓",
+        }
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, params=params, headers=headers, timeout=10)
+        res.encoding = "utf-8"
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        cats = []
+        items = soup.select(".listitem")[:5]  # 只取前5隻
+        
+        for item in items:
+            try:
+                name = item.select_one(".name")
+                area = item.select_one(".area")
+                link = item.select_one("a")
+                
+                cat_name = name.text.strip() if name else "未命名"
+                cat_area = area.text.strip() if area else "台北市"
+                cat_link = "https://www.pet.gov.tw" + link["href"] if link else url
+                
+                cats.append(f"🐱 {cat_name}\n📍 {cat_area}\n🔗 {cat_link}")
+            except:
+                continue
+        
+        if cats:
+            return "最新待認養貓咪（雙北市）：\n\n" + "\n\n".join(cats)
+        else:
+            return "目前查無資料，請直接前往：\nhttps://www.pet.gov.tw/Web/O302.aspx"
+    except Exception as e:
+        return f"抓取失敗，請直接前往：\nhttps://www.pet.gov.tw/Web/O302.aspx"
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -23,29 +61,9 @@ def callback():
 def handle_message(event):
     user_message = event.message.text
     if '找貓咪' in user_message or '收養' in user_message or '浪貓' in user_message:
-        reply = (
-            "🐱 雙北市流浪貓收養管道整理：\n\n"
-            "【政府官方】\n"
-            "① 台北市動物之家\n"
-            "https://www.tcapo.gov.taipei\n\n"
-            "② 新北市動物之家\n"
-            "https://www.nacp.ntpc.gov.tw\n\n"
-            "③ 全國動物收容系統\n"
-            "https://www.pet.gov.tw/Web/O302.aspx\n\n"
-            "【民間認養平台】\n"
-            "④ 認養地圖\n"
-            "https://www.meetpets.idv.tw\n\n"
-            "⑤ 台灣認養地圖 Facebook\n"
-            "https://www.facebook.com/groups/taiwan.adopt\n\n"
-            "⑥ 流浪動物花園\n"
-            "http://www.doghome.org.tw\n\n"
-            "⑦ 台北市流浪貓保護協會\n"
-            "https://www.facebook.com/TaipeiCatProtection\n\n"
-            "💡 小提醒：政府動物之家的貓咪若沒有被認養，"
-            "會有安樂死風險，優先認養可以救牠們一命！"
-        )
+        reply = get_cats()
     else:
-        reply = "你好！輸入「找貓咪」，我幫你整理雙北市所有浪貓收養管道 🐱"
+        reply = "你好！輸入「找貓咪」，我幫你找最新待認養貓咪 🐱"
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
