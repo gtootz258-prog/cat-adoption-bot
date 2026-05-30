@@ -2,25 +2,12 @@ from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-import requests
 import os
 
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(os.environ.get('CHANNEL_ACCESS_TOKEN'))
 handler = WebhookHandler(os.environ.get('CHANNEL_SECRET'))
-
-def search_cats():
-    url = "https://www.pet.gov.tw/Web/O302.aspx"
-    try:
-        response = requests.get(url, timeout=10)
-        response.encoding = 'utf-8'
-        if response.status_code == 200:
-            return "🐱 最新浪貓收養資訊：\n請前往動物之家查詢：https://www.pet.gov.tw/Web/O302.aspx\n\n你可以在網站上依縣市篩選，找到離你最近的待認養貓咪！"
-        else:
-            return "目前無法取得資料，請稍後再試。"
-    except:
-        return "連線失敗，請稍後再試。"
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -35,10 +22,30 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
-    if '找貓' in user_message or '收養' in user_message or '浪貓' in user_message:
-        reply = search_cats()
+    if '找貓咪' in user_message or '收養' in user_message or '浪貓' in user_message:
+        reply = (
+            "🐱 雙北市流浪貓收養管道整理：\n\n"
+            "【政府官方】\n"
+            "① 台北市動物之家\n"
+            "https://www.tcapo.gov.taipei\n\n"
+            "② 新北市動物之家\n"
+            "https://www.nacp.ntpc.gov.tw\n\n"
+            "③ 全國動物收容系統\n"
+            "https://www.pet.gov.tw/Web/O302.aspx\n\n"
+            "【民間認養平台】\n"
+            "④ 認養地圖\n"
+            "https://www.meetpets.idv.tw\n\n"
+            "⑤ 台灣認養地圖 Facebook\n"
+            "https://www.facebook.com/groups/taiwan.adopt\n\n"
+            "⑥ 流浪動物花園\n"
+            "http://www.doghome.org.tw\n\n"
+            "⑦ 台北市流浪貓保護協會\n"
+            "https://www.facebook.com/TaipeiCatProtection\n\n"
+            "💡 小提醒：政府動物之家的貓咪若沒有被認養，"
+            "會有安樂死風險，優先認養可以救牠們一命！"
+        )
     else:
-        reply = "你好！輸入「找貓」或「收養」，我會幫你找浪貓收養資訊 🐱"
+        reply = "你好！輸入「找貓咪」，我幫你整理雙北市所有浪貓收養管道 🐱"
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
