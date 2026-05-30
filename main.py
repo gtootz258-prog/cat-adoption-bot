@@ -4,7 +4,6 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import os
 import requests
-from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -13,39 +12,32 @@ handler = WebhookHandler(os.environ.get('CHANNEL_SECRET'))
 
 def get_cats():
     try:
-        url = "https://www.pet.gov.tw/Web/O302.aspx"
+        url = "https://api.meetpets.idv.tw/v2/pets"
         params = {
-            "unit": "63000", # 台北市
-            "animal_kind": "貓",
+            "kind": "cat",
+            "city": "台北市",
+            "status": "open",
+            "limit": 5
         }
         headers = {"User-Agent": "Mozilla/5.0"}
         res = requests.get(url, params=params, headers=headers, timeout=10)
-        res.encoding = "utf-8"
-        soup = BeautifulSoup(res.text, "html.parser")
+        data = res.json()
         
         cats = []
-        items = soup.select(".listitem")[:5]  # 只取前5隻
-        
-        for item in items:
-            try:
-                name = item.select_one(".name")
-                area = item.select_one(".area")
-                link = item.select_one("a")
-                
-                cat_name = name.text.strip() if name else "未命名"
-                cat_area = area.text.strip() if area else "台北市"
-                cat_link = "https://www.pet.gov.tw" + link["href"] if link else url
-                
-                cats.append(f"🐱 {cat_name}\n📍 {cat_area}\n🔗 {cat_link}")
-            except:
-                continue
+        for pet in data.get("data", [])[:5]:
+            name = pet.get("name", "未命名")
+            city = pet.get("city", "雙北")
+            sex = "♂ 公" if pet.get("sex") == "M" else "♀ 母"
+            color = pet.get("color", "")
+            link = f"https://www.meetpets.idv.tw/pets/{pet.get('id')}"
+            cats.append(f"🐱 {name}｜{sex}｜{color}\n📍 {city}\n🔗 {link}")
         
         if cats:
-            return "最新待認養貓咪（雙北市）：\n\n" + "\n\n".join(cats)
+            return "🐾 最新待認養貓咪：\n\n" + "\n\n".join(cats)
         else:
-            return "目前查無資料，請直接前往：\nhttps://www.pet.gov.tw/Web/O302.aspx"
+            return "目前查無雙北市貓咪資料，請前往認養地圖查詢：\nhttps://www.meetpets.idv.tw"
     except Exception as e:
-        return f"抓取失敗，請直接前往：\nhttps://www.pet.gov.tw/Web/O302.aspx"
+        return f"查詢失敗，請直接前往認養地圖：\nhttps://www.meetpets.idv.tw"
 
 @app.route("/callback", methods=['POST'])
 def callback():
